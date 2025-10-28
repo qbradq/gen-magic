@@ -5,6 +5,7 @@ import (
 	"log"
 	"strconv"
 
+	"github.com/qbradq/gen-magic/data"
 	"github.com/qbradq/gen-magic/llm"
 	_ "modernc.org/sqlite"
 )
@@ -37,79 +38,18 @@ func (p *Project) Close() error {
 // dbInit initializes the database.
 func (p *Project) dbInit() error {
 	var err error
-	// Settings
-	if _, err = p.db.Exec(`
-		CREATE TABLE IF NOT EXISTS Settings (
-			id TEXT PRIMARY KEY NOT NULL,
-			val TEXT
-		);
-	`); err != nil {
-		log.Printf("error creating table Settings: %v\n", err)
+	// Construct schema
+	if _, err = p.db.Exec(data.SchemaSQL); err != nil {
+		log.Printf("error running schema script: %v\n", err)
 		return err
 	}
-	// LLM APIs
-	if _, err = p.db.Exec(`
-		CREATE TABLE IF NOT EXISTS APIs (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			id_str VARCHAR(32) UNIQUE NOT NULL,
-			name_txt VARCHAR(64) NOT NULL
-		);
-	`); err != nil {
-		log.Printf("error creating table APIs: %v\n", err)
-		return err
-	}
-	row := p.db.QueryRow("SELECT COUNT(*) FROM APIs")
-	var count int
-	if err := row.Scan(&count); err != nil {
-		log.Printf("error counting table APIs: %v\n", err)
-		return err
-	}
-	if count == 0 {
-		if _, err := p.db.Exec(`
-			INSERT INTO APIs (id_str, name_txt)
-			VALUES
-				('openrouter', 'OpenRouter.ai')
-			;
-		`); err != nil {
-			log.Printf("error populating table APIs: %v\n", err)
+	// Lay down base data if needed
+	if !p.BoolSetting("init.static-data-load.base", false) {
+		if _, err := p.db.Exec(data.StaticDataSQL); err != nil {
+			log.Printf("error running data script: %v\n", err)
 			return err
 		}
-	}
-	// LLM definitions
-	if _, err = p.db.Exec(`
-		CREATE TABLE IF NOT EXISTS LLMs (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name_txt VARCHAR(64),
-			api INTEGER,
-			uri VARCHAR(255),
-			api_key VARCHAR(255),
-			model VARCHAR(255),
-			FOREIGN KEY (api) REFERENCES APIs(id)
-		);
-	`); err != nil {
-		log.Printf("error creating table LLMs: %v\n", err)
-		return err
-	}
-	row = p.db.QueryRow("SELECT COUNT(*) FROM LLMs")
-	if err := row.Scan(&count); err != nil {
-		log.Printf("error counting table LLMs: %v\n", err)
-		return err
-	}
-	if count == 0 {
-		if _, err := p.db.Exec(`
-			INSERT INTO LLMs (name_txt, uri, model, api)
-			VALUES
-				(
-					'OpenRouter.ai Llama 3 (Free)',
-					'https://openrouter.ai/api/v1',
-					'meta-llama/llama-3.3-70b-instruct:free',
-					(SELECT id FROM APIs WHERE id_str = 'openrouter')
-				)
-			;
-		`); err != nil {
-			log.Printf("error populating table LLMs: %v\n", err)
-			return err
-		}
+		p.SetBoolSetting("init.static-data-load.base", true)
 	}
 	return nil
 }
@@ -166,6 +106,30 @@ func (p *Project) SetIntSetting(key string, v int) error {
 	return p.SetStringSetting(key, strconv.FormatInt(int64(v), 10))
 }
 
+// BoolSetting returns the given setting as a boolean or the default value.
+func (p *Project) BoolSetting(key string, dv bool) bool {
+	var s string
+	row := p.db.QueryRow(`
+		SELECT
+			IFNULL(val, '') AS val
+		FROM Settings
+		WHERE id = ?
+		;
+	`, key)
+	if err := row.Scan(&s); err != nil {
+		return dv
+	}
+	v, err := strconv.ParseBool(s)
+	if err != nil {
+		return dv
+	}
+	return v
+}
+
+// SetBoolSetting sets the given setting from a boolean value.
+func (p *Project) SetBoolSetting(key string, v bool) error {
+	return p.SetStringSetting(key, strconv.FormatBool(v))
+}
 // LLMApi wraps the information for one LLM API.
 type LLMApi struct {
 	ID string
