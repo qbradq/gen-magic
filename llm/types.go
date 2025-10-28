@@ -12,10 +12,12 @@ import (
 // Definition contains all of the data needed to define and communicate with a
 // language model.
 type Definition struct {
-	API string `json:"api"` // LLM API in use
-	APIEndpoint string `json:"api_endpoint"` // Network endpoint for the API, if any
-	APIKey string `json:"api_key"` // Network endpoint API key, if any
-	Model string `json:"model"` // Model to use
+	ID int
+	Name string
+	API string
+	APIEndpoint string
+	APIKey string
+	Model string
 }
 
 // Image wraps an image.Image for the LLM.
@@ -87,10 +89,10 @@ func (l *Image) SetImage(img image.Image) error {
 
 // Message holds the data of a single LLM message.
 type Message struct {
-	Role string `json:"role"`
-	Content string `json:"content"`
-	Images []*Image `json:"images"`
-	Delta bool `json:"delta"`
+	Role string
+	Content string
+	Images []*Image
+	Delta bool
 }
 
 // Turn holds the data of a complete turn of LLM exchanges.

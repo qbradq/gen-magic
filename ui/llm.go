@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 	"strconv"
@@ -10,6 +9,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/driver/desktop"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -23,7 +23,7 @@ const maxHistory int = 100
 
 // LLM implements the LLM chat interface.
 type LLM struct {
-	id string
+	m *Main
 	def llm.Definition
 	root *fyne.Container
 	scroll *container.Scroll
@@ -38,17 +38,14 @@ type LLM struct {
 }
 
 // NewLLM returns a new LLM UI.
-func NewLLM(id string) *LLM {
+func NewLLM(m *Main) *LLM {
 	ret := &LLM{
-		id: id,
+		m: m,
 	}
-	ds := fyneApp.Preferences().String("llm." + id + ".def")
-	if len(ds) > 0 {
-		err := json.Unmarshal([]byte(ds), &ret.def)
-		if err != nil {
-			log.Printf("error loading llm def: %v", err)
-		}
-	}
+	m.w.Canvas().AddShortcut(&desktop.CustomShortcut{
+		KeyName: fyne.KeyEnter,
+		Modifier: fyne.KeyModifierControl,
+	}, nil)
 	ret.chat = container.NewVBox()
 	ret.scroll = container.NewVScroll(ret.chat)
 	ret.scroll.SetMinSize(fyne.NewSize(480, 320))
@@ -61,9 +58,6 @@ func NewLLM(id string) *LLM {
 	ret.progress.Hide()
 	ret.submit = widget.NewButtonWithIcon("", theme.Icon(theme.IconNameMediaPlay), ret.Submit)
 	ret.ctxLengthEntry = widget.NewEntry()
-	ret.ctxLengthEntry.SetText(
-		strconv.Itoa(fyneApp.Preferences().Int("llm.context-length")),
-	)
 	ret.ctxLengthEntry.OnChanged = func(s string) {
 		if s == "" {
 			ret.ctxLengthEntry.SetText("0")
@@ -121,23 +115,6 @@ func NewLLM(id string) *LLM {
 						)),
 						ret.ctxLengthEntry,
 					),
-					widget.NewButtonWithIcon(
-						"Configure LLM",
-						theme.SettingsIcon(),
-						func() {
-							ShowLLMSettings(&ret.def, func(def llm.Definition) {
-								ret.def = def
-								d, err := json.Marshal(def)
-								if err != nil {
-									log.Printf("error marshaling llm def: %v", err)
-								}
-								fyneApp.Preferences().SetString(
-									"llm." + ret.id + ".def",
-									string(d),
-								)
-							})
-						},
-					),
 					ret.stop,
 					ret.submit,
 				),
@@ -186,7 +163,7 @@ func (l *LLM) Submit() {
 		dialog.ShowInformation(
 			"Completion Error",
 			err.Error(),
-			window,
+			l.m.w,
 		)	
 	}
 	go func() {
@@ -226,6 +203,7 @@ func (l *LLM) Submit() {
 func (l *LLM) LogPrompt() *ChatBubble {
 	s := l.prompt.Text
 	bubble := NewChatBubble(
+		l.m,
 		cases.Title(language.AmericanEnglish).String("user"),
 		s,
 		theme.Color(theme.ColorNameInputBackground),
@@ -239,6 +217,7 @@ func (l *LLM) LogPrompt() *ChatBubble {
 // LogResponse adds the response message to the chat log.
 func (l *LLM) LogResponse(msg *llm.Message) *ChatBubble {
 	bubble := NewChatBubble(
+		l.m,
 		cases.Title(language.AmericanEnglish).String(msg.Role),
 		msg.Content,
 		theme.Color(theme.ColorNameBackground),
@@ -256,5 +235,5 @@ func (l *LLM) Root() *fyne.Container {
 
 // Focus focuses the prompt entry.
 func (l *LLM) Focus() {
-	window.Canvas().Focus(l.prompt)
+	l.m.w.Canvas().Focus(l.prompt)
 }
