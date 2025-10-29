@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -62,6 +63,9 @@ func (m *Main) mainMenu() *fyne.MainMenu {
 					if err != nil {
 						log.Printf("error in new project file: %v\n", err)
 					}
+					if writer == nil {
+						return
+					}
 					m.LoadProject(writer.URI().Path())
 				}, m.w)
 				fileSave.SetConfirmText("Create Project")
@@ -73,7 +77,22 @@ func (m *Main) mainMenu() *fyne.MainMenu {
 				fileSave.Show()
 			}),
 			fyne.NewMenuItem("Open Project", func() {
-
+				fileOpen := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
+					if err != nil {
+						log.Printf("error in open project file: %v\n", err)
+					}
+					if reader == nil {
+						return
+					}
+					m.LoadProject(reader.URI().Path())
+				}, m.w)
+				fileOpen.SetConfirmText("Open Project")
+				fileOpen.SetDismissText("Cancel")
+				fileOpen.SetFilter(storage.NewExtensionFileFilter([]string{
+					".gen-magic",
+				}))
+				fileOpen.SetTitleText("Open Project")
+				fileOpen.Show()
 			}),
 			fyne.NewMenuItemSeparator(),
 			fyne.NewMenuItem("Quit", func() {
@@ -93,5 +112,10 @@ func (m *Main) mainMenu() *fyne.MainMenu {
 // LoadProject loads a project by filename.
 func (m *Main) LoadProject(p string) error {
 	m.p.Close()
-	return m.p.Load("sqlite", p)
+	if err := m.p.Load("sqlite", p); err != nil {
+		return err
+	}
+	m.w.SetTitle(fmt.Sprintf("Gen Magic \"%s\"", p))
+	m.app.Preferences().SetString("last-open-project", p)
+	return nil
 }
