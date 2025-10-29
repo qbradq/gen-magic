@@ -15,6 +15,8 @@ type Project struct {
 	db *sql.DB
 }
 
+// WithDB executes a method with the database.
+
 // Connect connects to a data source, completely replacing any existing data.
 func (p *Project) Load(driver, source string) error {
 	var err error
@@ -144,6 +146,7 @@ func (p *Project) ListAPIs() []LLMApi {
 			id_str,
 			name_txt
 		FROM APIs
+		ORDER BY ID ASC
 		;
 	`)
 	if err != nil {
@@ -164,7 +167,7 @@ func (p *Project) ListAPIs() []LLMApi {
 
 // LLMName names an LLM definition.
 type LLMName struct {
-	ID int
+	ID int64
 	Name string
 }
 
@@ -176,6 +179,7 @@ func (p *Project) ListLLMs() []LLMName {
 			id,
 			name_txt
 		FROM LLMs
+		ORDER BY id ASC
 		;
 	`)
 	if err != nil {
@@ -195,7 +199,7 @@ func (p *Project) ListLLMs() []LLMName {
 }
 
 // GetLLM returns an LLM definition from the project.
-func (p *Project) GetLLM(id int) *llm.Definition {
+func (p *Project) GetLLM(id int64) *llm.Definition {
 	row := p.db.QueryRow(`
 		SELECT
 			LLMs.id,
@@ -212,8 +216,7 @@ func (p *Project) GetLLM(id int) *llm.Definition {
 	ret := &llm.Definition{}
 	err := row.Scan(&ret.ID, &ret.Name, &ret.API, &ret.APIEndpoint, &ret.APIKey, &ret.Model)
 	if err != nil {
-		log.Printf("error getting LLM (scan): %v\n", err)
-		return nil
+		log.Fatalf("error getting LLM (scan): %v\n", err)
 	}
 	return ret
 }
@@ -233,4 +236,43 @@ func (p *Project) SetLLM(def *llm.Definition) error {
 		;
 	`, def.Name, def.API, def.APIEndpoint, def.APIKey, def.Model, def.ID)
 	return err
+}
+
+// NewLLM returns a newly allocated LLM with a database ID.
+func (p *Project) NewLLM() *llm.Definition {
+	ret := &llm.Definition{
+		Name: "Un-named LLM",
+		API: "openrouter",
+		APIEndpoint: "https://openrouter.ai/api/v1",
+		Model: "meta-llama/llama-3.3-70b-instruct:free",
+	}
+	res, err := p.db.Exec(`
+		INSERT INTO LLMs (name_txt, api, uri, model)
+		VALUES (
+			?,
+			(SELECT id FROM APIs WHERE id_str = ?),
+			?,
+			?
+		);
+	`, ret.Name, ret.API, ret.APIEndpoint, ret.Model)
+	if err != nil {
+		log.Fatalf("error inserting new LLM definition: %v\n", err)
+	}
+	ret.ID, err = res.LastInsertId()
+	if err != nil {
+		log.Fatalf("error inserting new LLM definition ID: %v\n", err)
+	}
+	return ret
+}
+
+// DeleteLLM deletes the given LLM.
+func (p *Project) DeleteLLM(def *llm.Definition) {
+	_, err := p.db.Exec(`
+		DELETE FROM LLMs
+		WHERE id = ?
+		;
+	`, def.ID)
+	if err != nil {
+		log.Fatalf("error deleting LLM definition: %v\n", err)
+	}
 }

@@ -12,7 +12,7 @@ import (
 // Definition contains all of the data needed to define and communicate with a
 // language model.
 type Definition struct {
-	ID int
+	ID int64
 	Name string
 	API string
 	APIEndpoint string

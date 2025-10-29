@@ -28,3 +28,11 @@ CREATE TABLE IF NOT EXISTS LLMs (
     FOREIGN KEY (api) REFERENCES APIs(id)
 );
 
+-- Agent definitions
+CREATE TABLE IF NOT EXISTS Agents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name_txt VARCHAR(64),
+    llm INTEGER,
+    sys_prompt TEXT,
+    FOREIGN KEY (llm) REFERENCES LLMs(id)
+);

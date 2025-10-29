@@ -26,6 +26,34 @@ func ShowLLMSettings(m *Main) {
 	var apis []LLMApi
 	lastEditedLLM := m.p.IntSetting("llm.last-edited", 0)
 	// Internal functions
+	var refreshLLMList = func() {
+		llms = m.p.ListLLMs()
+		llmStrs := []string{}
+		for _, llmName := range llms {
+			llmStrs = append(llmStrs, llmName.Name)
+		}
+		llmSelect.SetOptions(llmStrs)
+		temp := llmSelect.OnChanged
+		llmSelect.OnChanged = nil
+		llmSelect.SetSelectedIndex(lastEditedLLM)
+		llmSelect.OnChanged = temp
+	}
+	var updateUI = func() {
+		// Set the value of all inputs
+		refreshLLMList()
+		llmNameEntry.SetText(def.Name)
+		apiIdx := -1
+		for i, api := range apis {
+			if api.ID == def.API {
+				apiIdx = i
+				break
+			}
+		}
+		apiSelect.SetSelectedIndex(apiIdx)
+		urlEntry.SetText(def.APIEndpoint)
+		modelEntry.SetText(def.Model)
+		apiKeyEntry.SetText(def.APIKey)
+	}
 	var save = func() {
 		if def != nil {
 			if err := m.p.SetLLM(def); err != nil {
@@ -33,7 +61,7 @@ func ShowLLMSettings(m *Main) {
 			}
 		}
 	}
-	var load = func(id int) {
+	var load = func(id int64) {
 		// Load the LLM definition
 		def = m.p.GetLLM(id)
 		if def == nil {
@@ -43,19 +71,10 @@ func ShowLLMSettings(m *Main) {
 			)
 			m.app.Quit()
 		}
-		// Set the value of all inputs
-		llmSelect.SetSelectedIndex(id)
-		llmNameEntry.SetText(def.Name)
-		apiIdx := -1
-		for i, api := range apis {
-			if api.ID == def.API {
-				apiIdx = i
-			}
-		}
-		apiSelect.SetSelectedIndex(apiIdx)
-		urlEntry.SetText(def.APIEndpoint)
-		modelEntry.SetText(def.Model)
-		apiKeyEntry.SetText(def.APIKey)
+		temp := llmSelect.OnChanged
+		llmSelect.OnChanged = nil
+		updateUI()
+		llmSelect.OnChanged = temp
 	}
 	// LLM select
 	llmSelect = widget.NewSelect(nil, func(s string) {
@@ -67,21 +86,32 @@ func ShowLLMSettings(m *Main) {
 		m.app.Preferences().SetInt("llm.last-edited", lastEditedLLM)
 		load(llms[lastEditedLLM].ID)
 	})
-	var refreshLLMList = func() {
-		llms = m.p.ListLLMs()
-		llmStrs := []string{}
-		for _, llmName := range llms {
-			llmStrs = append(llmStrs, llmName.Name)
-		}
-		llmSelect.SetOptions(llmStrs)
-		llmSelect.SetSelectedIndex(lastEditedLLM)
-	}
 	f.Append("LLM", container.NewBorder(nil, nil, nil, container.NewHBox(
 				widget.NewButtonWithIcon("", theme.Icon(theme.IconNameDelete), func() {
-					// TODO Delete LLM
+					m.p.DeleteLLM(def)
+					def = nil
+					temp := m.p.ListLLMs()
+					if len(temp) == 0 {
+						def = m.p.NewLLM()
+						lastEditedLLM = 0
+					} else {
+						lastEditedLLM--
+						if lastEditedLLM < 0 {
+							lastEditedLLM = 0
+						}
+						def = m.p.GetLLM(llms[lastEditedLLM].ID)
+					}
+					m.app.Preferences().SetInt("llm.last-edited", lastEditedLLM)
+					updateUI()
 				}),
 				widget.NewButtonWithIcon("", theme.Icon(theme.IconNameFile), func() {
-					// TODO New LLM
+					save()
+					d := m.p.NewLLM()
+					def = nil
+					refreshLLMList()
+					llmSelect.SetSelectedIndex(len(llmSelect.Options)-1)
+					def = d
+					updateUI()
 				}),
 			),
 			llmSelect,
