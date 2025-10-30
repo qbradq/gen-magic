@@ -199,7 +199,7 @@ func (p *Project) ListLLMs() []LLMName {
 }
 
 // GetLLM returns an LLM definition from the project.
-func (p *Project) GetLLM(id int64) *llm.Definition {
+func (p *Project) GetLLM(id int64) *llm.LanguageModel {
 	row := p.db.QueryRow(`
 		SELECT
 			LLMs.id,
@@ -213,16 +213,17 @@ func (p *Project) GetLLM(id int64) *llm.Definition {
 		WHERE LLMs.id = ?
 		;
 	`, id)
-	ret := &llm.Definition{}
+	ret := &llm.LanguageModel{}
 	err := row.Scan(&ret.ID, &ret.Name, &ret.API, &ret.APIEndpoint, &ret.APIKey, &ret.Model)
 	if err != nil {
+		panic(err)
 		log.Fatalf("error getting LLM (scan): %v\n", err)
 	}
 	return ret
 }
 
 // SetLLM stores an LLM definition in the project.
-func (p *Project) SetLLM(def *llm.Definition) error {
+func (p *Project) SetLLM(def *llm.LanguageModel) error {
 	_, err := p.db.Exec(`
 		UPDATE LLMs
 		SET
@@ -239,8 +240,8 @@ func (p *Project) SetLLM(def *llm.Definition) error {
 }
 
 // NewLLM returns a newly allocated LLM with a database ID.
-func (p *Project) NewLLM() *llm.Definition {
-	ret := &llm.Definition{
+func (p *Project) NewLLM() *llm.LanguageModel {
+	ret := &llm.LanguageModel{
 		Name: "Un-named LLM",
 		API: "openrouter",
 		APIEndpoint: "https://openrouter.ai/api/v1",
@@ -266,7 +267,7 @@ func (p *Project) NewLLM() *llm.Definition {
 }
 
 // DeleteLLM deletes the given LLM.
-func (p *Project) DeleteLLM(def *llm.Definition) {
+func (p *Project) DeleteLLM(def *llm.LanguageModel) {
 	_, err := p.db.Exec(`
 		DELETE FROM LLMs
 		WHERE id = ?
@@ -274,5 +275,109 @@ func (p *Project) DeleteLLM(def *llm.Definition) {
 	`, def.ID)
 	if err != nil {
 		log.Fatalf("error deleting LLM definition: %v\n", err)
+	}
+}
+
+// AgentName identifies an agent.
+type AgentName struct {
+	ID int64
+	Name string
+}
+
+// ListAgents lists all agent definitions.
+func (p *Project) ListAgents() []AgentName {
+	ret := []AgentName{}
+	rows, err := p.db.Query(`
+		SELECT id, name_txt
+		FROM Agents
+		;
+	`)
+	if err != nil {
+		log.Fatalf("error listing agents (select): %v\n", err)
+	}
+	for rows.Next() {
+		name := AgentName{}
+		if err := rows.Scan(&name.ID, &name.Name); err != nil {
+			log.Fatalf("error listing agents (scan): %v\n", err)
+		}
+		ret = append(ret, name)
+	}
+	return ret
+}
+
+// GetAgent returns an agent by ID.
+func (p *Project) GetAgent(id int64) *llm.Agent {
+	ret := &llm.Agent{
+		ID: id,
+		System: llm.Message{
+			Role: "system",
+		},
+	}
+	row := p.db.QueryRow(`
+		SELECT name_txt, llm, sys_prompt
+		FROM Agents
+		WHERE id = ?
+		;
+	`, id)
+	var llmID int64
+	if err := row.Scan(&ret.Name, &llmID, &ret.System.Content); err != nil {
+		log.Fatalf("error getting agent (select): %v\n", err)
+	}
+	ret.LLM = p.GetLLM(llmID)
+	return ret
+}
+
+// SetAgent sets the agent's information.
+func (p *Project) SetAgent(agent *llm.Agent) {
+	_, err := p.db.Exec(`
+		UPDATE Agents
+		SET
+			name_txt = ?,
+			llm = ?,
+			sys_prompt = ?
+		WHERE
+			id = ?
+		;
+	`, agent.Name, agent.LLM.ID, agent.System.Content, agent.ID)
+	if err != nil {
+		log.Fatalf("error setting agent (update): %v\n", err)
+	}
+}
+
+// NewAgent returns a new Agent object.
+func (p *Project) NewAgent() *llm.Agent {
+	llms := p.ListLLMs()
+	ret := &llm.Agent{
+		Name: "Unnamed Agent",
+		LLM: p.GetLLM(llms[0].ID),
+		System: llm.Message{
+			Role: "system",
+			Content: "You are a helpful AI assistant.",
+		},
+	}
+	res, err := p.db.Exec(`
+		INSERT INTO Agents (name_txt, llm, sys_prompt)
+		VALUES (?, ?, ?)
+		;
+	`, ret.Name, ret.LLM.ID, ret.System.Content)
+	if err != nil {
+		log.Fatalf("error creating new agent (insert): %v\n", err)
+	}
+	ret.ID, err = res.LastInsertId()
+	if err != nil {
+		log.Fatalf("error creating new agent (last_id): %v\n", err)
+	}
+	return ret
+}
+
+// DeleteAgent deletes the given agent.
+func (p *Project) DeleteAgent(agent *llm.Agent) {
+	_, err := p.db.Exec(`
+		DELETE FROM Agents
+		WHERE id = ?
+		;
+	`, agent.ID)
+	if err != nil {
+		log.Fatalf("error deleting agent (delete): %v\n", err)
 	}
 }

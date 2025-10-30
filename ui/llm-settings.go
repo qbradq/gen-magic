@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"log"
 
 	"fyne.io/fyne/v2/container"
@@ -14,7 +13,7 @@ import (
 // ShowLLMSettings creates and shows a new LLMSettings dialog.
 func ShowLLMSettings(m *Main) {
 	// Setup variables
-	var def *llm.Definition
+	var def *llm.LanguageModel
 	f := widget.NewForm()
 	var llmSelect *IndexedSelect
 	var llmNameEntry *widget.Entry
@@ -33,13 +32,7 @@ func ShowLLMSettings(m *Main) {
 			llmStrs = append(llmStrs, llmName.Name)
 		}
 		llmSelect.SetOptions(llmStrs)
-		temp1 := llmSelect.OnChanged
-		temp2 := llmSelect.OnChangedIndexed
-		llmSelect.OnChanged = nil
-		llmSelect.OnChangedIndexed = nil
-		llmSelect.SetSelectedIndex(lastEditedLLM)
-		llmSelect.OnChanged = temp1
-		llmSelect.OnChangedIndexed = temp2
+		llmSelect.rawSetSelectedIndex(lastEditedLLM)
 	}
 	var updateUI = func() {
 		// Set the value of all inputs
@@ -65,19 +58,8 @@ func ShowLLMSettings(m *Main) {
 		}
 	}
 	var load = func(id int64) {
-		// Load the LLM definition
 		def = m.p.GetLLM(id)
-		if def == nil {
-			dialog.NewError(
-				fmt.Errorf("failed to load LLM %d", id),
-				m.w,
-			)
-			m.app.Quit()
-		}
-		temp := llmSelect.OnChanged
-		llmSelect.OnChanged = nil
 		updateUI()
-		llmSelect.OnChanged = temp
 	}
 	// LLM select
 	llmSelect = NewIndexedSelect(nil, func(i int) {
@@ -85,7 +67,7 @@ func ShowLLMSettings(m *Main) {
 			return
 		}
 		save()
-		lastEditedLLM = llmSelect.SelectedIndex()
+		lastEditedLLM = i
 		m.p.SetIntSetting("llm.last-edited", lastEditedLLM)
 		load(llms[lastEditedLLM].ID)
 	})
@@ -171,6 +153,7 @@ func ShowLLMSettings(m *Main) {
 	dlg := dialog.NewCustom("LLM Definitions", "Done", f, m.w)
 	dlg.SetOnClosed(func() {
 		save()
+		m.FireOnLLMsUpdated()
 	})
 	dlg.Resize(dlg.MinSize().AddWidthHeight(240, 0))
 	dlg.Show()

@@ -9,9 +9,9 @@ import (
 	"strings"
 )
 
-// Definition contains all of the data needed to define and communicate with a
-// language model.
-type Definition struct {
+// LanguageModel contains all of the data needed to define and communicate with
+// a language model.
+type LanguageModel struct {
 	ID int64
 	Name string
 	API string
@@ -97,7 +97,7 @@ type Message struct {
 
 // Turn holds the data of a complete turn of LLM exchanges.
 type Turn struct {
-	Definition Definition
+	Definition LanguageModel
 	System *Message
 	Prompt *Message
 	Response []*Message

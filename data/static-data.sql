@@ -24,7 +24,7 @@ VALUES (
 INSERT INTO Agents (name_txt, llm, sys_prompt)
 VALUES (
     'Agent Red',
-    0,
+    (SELECT id FROM LLMs ORDER BY id ASC LIMIT 1),
     'You are a helpful AI assistant'
 );
 

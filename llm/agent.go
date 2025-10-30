@@ -4,6 +4,6 @@ package llm
 type Agent struct {
 	ID int64
 	Name string
-	Definition *Definition
-	System *Message
+	LLM *LanguageModel
+	System Message
 }

@@ -115,6 +115,7 @@ func (m *Main) mainMenu() *fyne.MainMenu {
 				ShowLLMSettings(m)
 			}),
 			fyne.NewMenuItem("Agents", func() {
+				ShowAgentSettings(m)
 			}),
 		),
 		fyne.NewMenu("Start",
@@ -161,4 +162,16 @@ func (m *Main) LoadProject(p string) error {
 	m.w.SetTitle(fmt.Sprintf("Gen Magic \"%s\"", p))
 	m.app.Preferences().SetString("last-open-project", p)
 	return nil
+}
+
+// FireOnLLMsUpdated fires the OnLLMsUpdated method on all open windows that
+// implement it.
+func (m *Main) FireOnLLMsUpdated() {
+	for child := range maps.Keys(m.children) {
+		iChild, ok := child.(interface{OnLLMsUpdated()})
+		if !ok {
+			continue
+		}
+		iChild.OnLLMsUpdated()
+	}
 }

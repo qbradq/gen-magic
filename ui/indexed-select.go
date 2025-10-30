@@ -34,7 +34,7 @@ func NewIndexedSelect(options []string, onChangedIndexed func(idx int)) *Indexed
 		}
 	}
 	ret.SetOptions(options)
-	ret.SetSelectedIndex(0)	
+	ret.rawSetSelectedIndex(0)	
 	return ret
 }
 
@@ -53,7 +53,7 @@ func (w *IndexedSelect) SetSelected(text string) {
 	}
 }
 
-func (w *IndexedSelect) SetSelectedIndex(index int) {
+func (w *IndexedSelect) rawSetSelectedIndex(index int) {
 	defer w.Refresh()
 	if len(w.Options) == 0 {
 		w.CurrentSelectedIndex = 0
@@ -68,6 +68,10 @@ func (w *IndexedSelect) SetSelectedIndex(index int) {
 	}
 	w.CurrentSelectedIndex = index
 	w.Selected = w.Options[index]
+}
+
+func (w *IndexedSelect) SetSelectedIndex(index int) {
+	w.rawSetSelectedIndex(index)
 	if w.OnChangedIndexed != nil {
 		w.OnChangedIndexed(w.CurrentSelectedIndex)
 	}

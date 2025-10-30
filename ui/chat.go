@@ -25,7 +25,7 @@ const maxHistory int = 100
 type Chat struct {
 	w fyne.Window
 	m *Main
-	def llm.Definition
+	def llm.LanguageModel
 	root *fyne.Container
 	scroll *container.Scroll
 	chat *fyne.Container

@@ -9,7 +9,7 @@ import (
 	"github.com/revrost/go-openrouter"
 )
 
-func openRouterChatCompletion(def *Definition, system, prompt *Message, chatContext []*Turn) (chan *Message, func(), error) {
+func openRouterChatCompletion(def *LanguageModel, system, prompt *Message, chatContext []*Turn) (chan *Message, func(), error) {
 	if def.APIEndpoint == "" {
 		return nil, nil, errors.New("an API endpoint is required in LLM configuration for OpenRouter")
 	}
