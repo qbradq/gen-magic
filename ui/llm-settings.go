@@ -16,9 +16,9 @@ func ShowLLMSettings(m *Main) {
 	// Setup variables
 	var def *llm.Definition
 	f := widget.NewForm()
-	var llmSelect *widget.Select
+	var llmSelect *IndexedSelect
 	var llmNameEntry *widget.Entry
-	var apiSelect *widget.Select
+	var apiSelect *IndexedSelect
 	var urlEntry *widget.Entry
 	var modelEntry *widget.Entry
 	var apiKeyEntry *widget.Entry
@@ -33,10 +33,13 @@ func ShowLLMSettings(m *Main) {
 			llmStrs = append(llmStrs, llmName.Name)
 		}
 		llmSelect.SetOptions(llmStrs)
-		temp := llmSelect.OnChanged
+		temp1 := llmSelect.OnChanged
+		temp2 := llmSelect.OnChangedIndexed
 		llmSelect.OnChanged = nil
+		llmSelect.OnChangedIndexed = nil
 		llmSelect.SetSelectedIndex(lastEditedLLM)
-		llmSelect.OnChanged = temp
+		llmSelect.OnChanged = temp1
+		llmSelect.OnChangedIndexed = temp2
 	}
 	var updateUI = func() {
 		// Set the value of all inputs
@@ -77,13 +80,13 @@ func ShowLLMSettings(m *Main) {
 		llmSelect.OnChanged = temp
 	}
 	// LLM select
-	llmSelect = widget.NewSelect(nil, func(s string) {
+	llmSelect = NewIndexedSelect(nil, func(i int) {
 		if def == nil {
 			return
 		}
 		save()
 		lastEditedLLM = llmSelect.SelectedIndex()
-		m.app.Preferences().SetInt("llm.last-edited", lastEditedLLM)
+		m.p.SetIntSetting("llm.last-edited", lastEditedLLM)
 		load(llms[lastEditedLLM].ID)
 	})
 	f.Append("LLM", container.NewBorder(nil, nil, nil, container.NewHBox(
@@ -101,7 +104,7 @@ func ShowLLMSettings(m *Main) {
 						}
 						def = m.p.GetLLM(llms[lastEditedLLM].ID)
 					}
-					m.app.Preferences().SetInt("llm.last-edited", lastEditedLLM)
+					m.p.SetIntSetting("llm.last-edited", lastEditedLLM)
 					updateUI()
 				}),
 				widget.NewButtonWithIcon("", theme.Icon(theme.IconNameFile), func() {
@@ -134,7 +137,7 @@ func ShowLLMSettings(m *Main) {
 	for _, api := range apis {
 		apiNames = append(apiNames, api.Name)
 	}
-	apiSelect = widget.NewSelect(apiNames, nil)
+	apiSelect = NewIndexedSelect(apiNames, nil)
 	apiSelect.OnChanged = func(s string) {
 		if def == nil {
 			return

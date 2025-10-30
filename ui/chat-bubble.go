@@ -23,7 +23,7 @@ type ChatBubble struct {
 }
 
 // NewChatBubble returns a new chat bubble with the given data.
-func NewChatBubble(m *Main, role, text string, bubbleColor color.Color, alignRight bool) *ChatBubble {
+func NewChatBubble(role, text string, bubbleColor color.Color, alignRight bool) *ChatBubble {
 	ret := &ChatBubble{
 		Role: role,
 		Text: text,
@@ -52,7 +52,7 @@ func NewChatBubble(m *Main, role, text string, bubbleColor color.Color, alignRig
 				layout.NewSpacer(),
 				container.NewPadded(
 					widget.NewButtonWithIcon("", theme.ContentCopyIcon(), func() {
-						m.app.Clipboard().SetContent(ret.Text)
+						fyne.CurrentApp().Clipboard().SetContent(ret.Text)
 					}),
 				),
 			),

@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -14,11 +15,17 @@ import (
 	"github.com/qbradq/gen-magic/data"
 )
 
+// Closer implementations offer a Close() method.
+type Closer interface {
+	Close()
+}
+
 // Main implements the main UI.
 type Main struct {
 	app fyne.App
 	w fyne.Window
 	p Project
+	children map[Closer]struct{}
 }
 
 // NewMain returns a new Main UI and returns it.
@@ -28,7 +35,11 @@ func NewMain() *Main {
 	ret := &Main{
 		app: app,
 		w: w,
+		children: map[Closer]struct{}{},
 	}
+	ret.w.SetOnClosed(func() {
+		ret.CloseChildren()  
+	})
 	ret.w.SetMainMenu(ret.mainMenu())
 	ret.w.SetContent(
 		canvas.NewImageFromImage(data.BackgroundImage),
@@ -106,11 +117,43 @@ func (m *Main) mainMenu() *fyne.MainMenu {
 			fyne.NewMenuItem("Agents", func() {
 			}),
 		),
+		fyne.NewMenu("Start",
+			fyne.NewMenuItem("Chat", func() {
+				var chat Closer
+				chat = NewChat(m, func() {
+					delete(m.children, chat)
+				})
+				m.children[chat] = struct{}{}
+			}),
+		),
 	)
+}
+
+// AddChild adds a Closer to the app as a child.
+func (m *Main) AddChild(child Closer) {
+	m.children[child] = struct{}{}
+}
+
+// RemoveChild removes a Closer from the app.
+func (m *Main) RemoveChild(child Closer) {
+	delete(m.children, child)
+}
+
+// CloseChildren closes all open child windows.
+func (m *Main) CloseChildren() {
+	closers := []Closer{}
+	for closer := range maps.Keys(m.children) {
+		closers = append(closers, closer)
+	}
+	for _, closer := range closers {
+		closer.Close()
+		delete(m.children, closer)
+	}
 }
 
 // LoadProject loads a project by filename.
 func (m *Main) LoadProject(p string) error {
+	m.CloseChildren()
 	m.p.Close()
 	if err := m.p.Load("sqlite", p); err != nil {
 		return err

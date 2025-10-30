@@ -21,8 +21,9 @@ import (
 // Max number of messages in history.
 const maxHistory int = 100
 
-// LLM implements the LLM chat interface.
-type LLM struct {
+// Chat implements the Chat chat interface.
+type Chat struct {
+	w fyne.Window
 	m *Main
 	def llm.Definition
 	root *fyne.Container
@@ -33,19 +34,28 @@ type LLM struct {
 	submit *widget.Button
 	stop *widget.Button
 	ctxLengthEntry *widget.Entry
+	llms []LLMName
+	llmSelect *IndexedSelect
 	history []*llm.Turn
 	cancelCompletion func()
 }
 
-// NewLLM returns a new LLM UI.
-func NewLLM(m *Main) *LLM {
-	ret := &LLM{
+// NewChat returns a new Chat UI.
+func NewChat(m *Main, onClose func()) *Chat {
+	ret := &Chat{
+		w: fyne.CurrentApp().NewWindow("Chat"),
 		m: m,
 	}
-	m.w.Canvas().AddShortcut(&desktop.CustomShortcut{
+	ret.w.Canvas().AddShortcut(&desktop.CustomShortcut{
 		KeyName: fyne.KeyEnter,
 		Modifier: fyne.KeyModifierControl,
 	}, nil)
+	ret.w.SetOnClosed(func() {
+		if onClose != nil {
+			onClose()
+		}
+		ret.Close()
+	})
 	ret.chat = container.NewVBox()
 	ret.scroll = container.NewVScroll(ret.chat)
 	ret.scroll.SetMinSize(fyne.NewSize(480, 320))
@@ -83,12 +93,18 @@ func NewLLM(m *Main) *LLM {
 		}
 		return nil
 	}
+	ret.ctxLengthEntry.SetText("5")
 	ret.stop = widget.NewButtonWithIcon("", theme.Icon(theme.IconNameMediaStop), func() {
 		if ret.cancelCompletion != nil {
 			ret.cancelCompletion()
 		}
 	})
 	ret.stop.Disable()
+	ret.llmSelect = NewIndexedSelect(nil, func(idx int) {
+		llm := ret.llms[idx]
+		ret.def = *ret.m.p.GetLLM(llm.ID)
+	})
+	ret.OnLLMsUpdated()
 	ret.root = container.NewPadded(
 		container.NewBorder(
 			nil,
@@ -105,18 +121,20 @@ func NewLLM(m *Main) *LLM {
 						),
 					),
 				),
-				container.NewHBox(
-					layout.NewSpacer(),
-					widget.NewLabel("Context Turns"),
-					container.New(
-						layout.NewGridWrapLayout(fyne.NewSize(
-							80,
-							ret.ctxLengthEntry.MinSize().Height,
-						)),
-						ret.ctxLengthEntry,
+				container.NewBorder(nil, nil, nil,
+					container.NewHBox(
+						widget.NewLabel("CTX"),
+						container.New(
+							layout.NewGridWrapLayout(fyne.NewSize(
+								80,
+								ret.ctxLengthEntry.MinSize().Height,
+							)),
+							ret.ctxLengthEntry,
+						),
+						ret.stop,
+						ret.submit,
 					),
-					ret.stop,
-					ret.submit,
+					ret.llmSelect,
 				),
 			),
 			nil,
@@ -124,18 +142,33 @@ func NewLLM(m *Main) *LLM {
 			ret.scroll,
 		),
 	)
+	ret.w.SetContent(ret.root)
+	ret.w.RequestFocus()
+	ret.Focus()
+	ret.w.Show()
+	ret.m.AddChild(ret)
 	return ret
 }
 
+// Close closes the window.
+func (l *Chat) Close() {
+	l.w.Close()
+	l.m.RemoveChild(l)
+}
+
 // Submit submits the current prompt if able.
-func (l *LLM) Submit() {
+func (l *Chat) Submit() {
 	promptText := l.prompt.Text
 	if promptText == "" {
 		return
 	}
 	v, err := strconv.ParseInt(l.ctxLengthEntry.Text, 10, 32)
 	if err != nil {
-		log.Fatalf("Error while parsing llm.context-length: %v", err)
+		log.Printf("error while parsing chat context length: %v", err)
+		v = 0
+		fyne.Do(func() {
+			l.ctxLengthEntry.SetText("0")
+		})
 	}
 	ctxLength := int(v)
 	promptBubble := l.LogPrompt()
@@ -163,8 +196,9 @@ func (l *LLM) Submit() {
 		dialog.ShowInformation(
 			"Completion Error",
 			err.Error(),
-			l.m.w,
-		)	
+			l.w,
+		)
+		return
 	}
 	go func() {
 		fyne.Do(func() {
@@ -200,10 +234,9 @@ func (l *LLM) Submit() {
 }
 
 // LogPrompt adds the prompt to the chat log.
-func (l *LLM) LogPrompt() *ChatBubble {
+func (l *Chat) LogPrompt() *ChatBubble {
 	s := l.prompt.Text
 	bubble := NewChatBubble(
-		l.m,
 		cases.Title(language.AmericanEnglish).String("user"),
 		s,
 		theme.Color(theme.ColorNameInputBackground),
@@ -215,9 +248,8 @@ func (l *LLM) LogPrompt() *ChatBubble {
 }
 
 // LogResponse adds the response message to the chat log.
-func (l *LLM) LogResponse(msg *llm.Message) *ChatBubble {
+func (l *Chat) LogResponse(msg *llm.Message) *ChatBubble {
 	bubble := NewChatBubble(
-		l.m,
 		cases.Title(language.AmericanEnglish).String(msg.Role),
 		msg.Content,
 		theme.Color(theme.ColorNameBackground),
@@ -229,11 +261,27 @@ func (l *LLM) LogResponse(msg *llm.Message) *ChatBubble {
 }
 
 // Root returns the root container.
-func (l *LLM) Root() *fyne.Container {
+func (l *Chat) Root() *fyne.Container {
 	return l.root
 }
 
 // Focus focuses the prompt entry.
-func (l *LLM) Focus() {
-	l.m.w.Canvas().Focus(l.prompt)
+func (l *Chat) Focus() {
+	l.w.Canvas().Focus(l.prompt)
+}
+
+// OnLLMsUpdated is called when the LLM list is updated.
+func (l *Chat) OnLLMsUpdated() {
+	s := l.llmSelect.Selected
+	list := []string{}
+	l.llms = l.m.p.ListLLMs()
+	for _, llm := range l.llms {
+		list = append(list, llm.Name)
+	}
+	l.llmSelect.SetOptions(list)
+	if s != "" {
+		l.llmSelect.SetSelected(s)
+	} else {
+		l.llmSelect.SetSelectedIndex(0)
+	}
 }

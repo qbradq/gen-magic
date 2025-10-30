@@ -10,6 +10,15 @@ import (
 )
 
 func openRouterChatCompletion(def *Definition, system, prompt *Message, chatContext []*Turn) (chan *Message, func(), error) {
+	if def.APIEndpoint == "" {
+		return nil, nil, errors.New("an API endpoint is required in LLM configuration for OpenRouter")
+	}
+	if def.APIKey == "" {
+		return nil, nil, errors.New("an API key is required in LLM configuration for OpenRouter")
+	}
+	if def.Model == "" {
+		return nil, nil, errors.New("a model is required in LLM configuration for OpenRouter")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	out := make(chan *Message, 1024)
 	client := openrouter.NewClient(def.APIKey)
