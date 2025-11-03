@@ -89,6 +89,7 @@ func (l *Image) SetImage(img image.Image) error {
 
 // Message holds the data of a single LLM message.
 type Message struct {
+	Error error
 	Role string
 	Content string
 	Images []*Image

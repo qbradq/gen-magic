@@ -6,6 +6,7 @@ require (
 	fyne.io/fyne/v2 v2.7.0
 	github.com/revrost/go-openrouter v0.2.6
 	golang.org/x/text v0.26.0
+	modernc.org/sqlite v1.39.1
 )
 
 require (
@@ -49,5 +50,4 @@ require (
 	modernc.org/libc v1.66.10 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.39.1 // indirect
 )

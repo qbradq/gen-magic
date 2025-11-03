@@ -9,6 +9,9 @@ INSERT INTO APIs (id_str, name_txt)
 VALUES (
     'openrouter',
     'OpenRouter.ai'
+),(
+    'ollama',
+    'Ollama Local or Remote'
 );
 
 -- Default LLM definition
@@ -18,6 +21,11 @@ VALUES (
     'https://openrouter.ai/api/v1',
     'meta-llama/llama-3.3-70b-instruct:free',
     (SELECT id FROM APIs WHERE id_str = 'openrouter')
+),(
+    'Qwen2.5-0.5B (local)',
+    'http://localhost:11434',
+    'qwen2.5:0.5b',
+    (SELECT id FROM APIs WHERE id_str = 'ollama')
 );
 
 -- Default agent definition

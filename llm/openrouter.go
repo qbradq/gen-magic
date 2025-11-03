@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
-	"log"
+	"log/slog"
 
 	"github.com/revrost/go-openrouter"
 )
@@ -26,6 +26,7 @@ func openRouterChatCompletion(def *LanguageModel, system, prompt *Message, chatC
 		openrouter.SystemMessage(system.Content),
 	}
 	for _, turn := range chatContext {
+		messages = append(messages, openrouter.UserMessage(turn.Prompt.Content))
 		for _, msg := range turn.Response {
 			switch msg.Role {
 			case "user":
@@ -33,13 +34,14 @@ func openRouterChatCompletion(def *LanguageModel, system, prompt *Message, chatC
 			case "assistant":
 				messages = append(messages, openrouter.AssistantMessage(msg.Content))
 			default:
-				log.Printf("error in openRouterChatCompletion unsupported message role in chat context %s\n", msg.Role)
+				slog.Error("error in openRouterChatCompletion unsupported message role in chat context", "role", msg.Role)
 			}
 		}
 	}
 	messages = append(messages, openrouter.UserMessage(prompt.Content))
 	go func() {
 		defer close(out)
+		defer cancel()
 		stream, err := client.CreateChatCompletionStream(ctx, openrouter.ChatCompletionRequest{
 			Model: def.Model,
 			Messages: messages,
@@ -49,7 +51,8 @@ func openRouterChatCompletion(def *LanguageModel, system, prompt *Message, chatC
 			},
 		})
 		if err != nil {
-			log.Printf("error requesting streaming response: %v\n", err)
+			slog.Error("error requesting streaming response", "error", err)
+			return
 		}
 		defer stream.Close()
 		first := true
@@ -57,12 +60,11 @@ func openRouterChatCompletion(def *LanguageModel, system, prompt *Message, chatC
 			response, err := stream.Recv()
 			if err != nil {
 				if !errors.Is(err, io.EOF) {
-					log.Printf("error streaming response: %v\n", err)
+					slog.Error("error streaming response", "error", err)
 				}
 				break
 			}
 			for _, choice := range response.Choices {
-				// log.Println(choice.Delta.Content)
 				out <- &Message{
 					Role: choice.Delta.Role,
 					Content: choice.Delta.Content,

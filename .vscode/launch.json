@@ -7,7 +7,9 @@
       "request": "launch",
       "mode": "auto",
       "program": "${workspaceFolder}",
-      "env": {},
+      "env": {
+        "DEBUG": "1"
+      },
       "args": []
     }
   ]

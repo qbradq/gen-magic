@@ -2,7 +2,7 @@ package ui
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"strconv"
 	"unicode"
 
@@ -164,7 +164,7 @@ func (l *Chat) Submit() {
 	}
 	v, err := strconv.ParseInt(l.ctxLengthEntry.Text, 10, 32)
 	if err != nil {
-		log.Printf("error while parsing chat context length: %v", err)
+		slog.Error("error while parsing chat context length", "error", err)
 		v = 0
 		fyne.Do(func() {
 			l.ctxLengthEntry.SetText("0")
@@ -193,11 +193,7 @@ func (l *Chat) Submit() {
 	msgs, cancel, err := llm.ChatCompletion(&turn.Definition, turn.System, turn.Prompt, ctx)
 	if err != nil {
 		l.chat.Remove(promptBubble)
-		dialog.ShowInformation(
-			"Completion Error",
-			err.Error(),
-			l.w,
-		)
+		dialog.ShowError(err, l.w)
 		return
 	}
 	go func() {
@@ -210,14 +206,24 @@ func (l *Chat) Submit() {
 		})
 		var bubble *ChatBubble
 		for msg := range msgs {
+			if msg.Error != nil {
+				if bubble != nil {
+					l.chat.Remove(bubble)
+				}
+				l.chat.Remove(promptBubble)
+				dialog.ShowError(msg.Error, l.w)
+				break
+			}
 			if !msg.Delta || bubble == nil {
 				turn.Response = append(turn.Response, msg)
 				bubble = l.LogResponse(msg)
 			} else {
 				turn.Response[len(turn.Response)-1].Content += msg.Content;
 				bubble.AppendText(msg.Content)
-				l.scroll.ScrollToBottom()
 			}
+			fyne.Do(func() {
+				l.scroll.ScrollToBottom()
+			})
 		}
 		fyne.Do(func() {
 			l.cancelCompletion = nil
@@ -255,8 +261,10 @@ func (l *Chat) LogResponse(msg *llm.Message) *ChatBubble {
 		theme.Color(theme.ColorNameBackground),
 		false,
 	)
-	l.chat.Add(bubble)
-	l.scroll.ScrollToBottom()
+	fyne.Do(func() {
+		l.chat.Add(bubble)
+		l.scroll.ScrollToBottom()
+	})
 	return bubble
 }
 

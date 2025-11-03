@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"log"
-
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/theme"
@@ -53,7 +51,7 @@ func ShowLLMSettings(m *Main) {
 	var save = func() {
 		if def != nil {
 			if err := m.p.SetLLM(def); err != nil {
-				log.Printf("error saving LLM: %v\n", err)
+				dialog.ShowError(err, m.w)
 			}
 		}
 	}
@@ -119,13 +117,12 @@ func ShowLLMSettings(m *Main) {
 	for _, api := range apis {
 		apiNames = append(apiNames, api.Name)
 	}
-	apiSelect = NewIndexedSelect(apiNames, nil)
-	apiSelect.OnChanged = func(s string) {
+	apiSelect = NewIndexedSelect(apiNames, func(idx int) {
 		if def == nil {
 			return
 		}
-		def.API = apis[apiSelect.SelectedIndex()].ID
-	}
+		def.API = apis[idx].ID
+	})
 	f.Append("API Type", apiSelect)
 	// URL entry
 	urlEntry = widget.NewEntry()

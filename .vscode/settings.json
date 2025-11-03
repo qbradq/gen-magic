@@ -4,6 +4,8 @@
     "fyne",
     "IFNULL",
     "llms",
+    "ollama",
+    "ollamaclient",
     "openrouter",
     "VARCHAR"
   ]

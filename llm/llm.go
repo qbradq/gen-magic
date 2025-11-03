@@ -11,6 +11,8 @@ func ChatCompletion(def *LanguageModel, system, prompt *Message, context []*Turn
 	switch strings.ToLower(def.API) {
 	case "openrouter":
 		return openRouterChatCompletion(def, system, prompt, context)
+	case "ollama":
+		return ollamaChatCompletion(def, system, prompt, context)
 	default:
 		return nil, nil, fmt.Errorf("unknown API \"%s\"", def.API)
 	}

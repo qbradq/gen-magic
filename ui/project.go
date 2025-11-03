@@ -2,7 +2,7 @@ package ui
 
 import (
 	"database/sql"
-	"log"
+	"log/slog"
 	"strconv"
 
 	"github.com/qbradq/gen-magic/data"
@@ -42,13 +42,13 @@ func (p *Project) dbInit() error {
 	var err error
 	// Construct schema
 	if _, err = p.db.Exec(data.SchemaSQL); err != nil {
-		log.Printf("error running schema script: %v\n", err)
+		slog.Error("error running schema script", "error", err)
 		return err
 	}
 	// Lay down base data if needed
 	if !p.BoolSetting("init.static-data-load.base", false) {
 		if _, err := p.db.Exec(data.StaticDataSQL); err != nil {
-			log.Printf("error running data script: %v\n", err)
+			slog.Error("error running data script", "error", err)
 			return err
 		}
 		p.SetBoolSetting("init.static-data-load.base", true)
@@ -150,14 +150,14 @@ func (p *Project) ListAPIs() []LLMApi {
 		;
 	`)
 	if err != nil {
-		log.Printf("error listing APIs (query): %v\n", err)
+		slog.Error("error listing APIs (query)", "error", err)
 		return nil
 	}
 	defer rows.Close()
 	for rows.Next() {
 		n := LLMApi{}
 		if err := rows.Scan(&n.ID, &n.Name); err != nil {
-			log.Printf("error listing APIs (scan): %v\n", err)
+			slog.Error("error listing APIs (scan)", "error", err)
 			return nil
 		}
 		ret = append(ret, n)
@@ -183,14 +183,14 @@ func (p *Project) ListLLMs() []LLMName {
 		;
 	`)
 	if err != nil {
-		log.Printf("error listing LLMs (query): %v\n", err)
+		slog.Error("error listing LLM (query)", "error", err)
 		return nil
 	}
 	defer rows.Close()
 	for rows.Next() {
 		n := LLMName{}
 		if err := rows.Scan(&n.ID, &n.Name); err != nil {
-			log.Printf("error listing LLMs (scan): %v\n", err)
+			slog.Error("error listing LLMs (scan)", "error", err)
 			return nil
 		}
 		ret = append(ret, n)
@@ -216,8 +216,7 @@ func (p *Project) GetLLM(id int64) *llm.LanguageModel {
 	ret := &llm.LanguageModel{}
 	err := row.Scan(&ret.ID, &ret.Name, &ret.API, &ret.APIEndpoint, &ret.APIKey, &ret.Model)
 	if err != nil {
-		panic(err)
-		log.Fatalf("error getting LLM (scan): %v\n", err)
+		slog.Error("error getting LLM (scan)", "error", err)
 	}
 	return ret
 }
@@ -257,11 +256,11 @@ func (p *Project) NewLLM() *llm.LanguageModel {
 		);
 	`, ret.Name, ret.API, ret.APIEndpoint, ret.Model)
 	if err != nil {
-		log.Fatalf("error inserting new LLM definition: %v\n", err)
+		slog.Error("error inserting new LLM definition", "error", err)
 	}
 	ret.ID, err = res.LastInsertId()
 	if err != nil {
-		log.Fatalf("error inserting new LLM definition ID: %v\n", err)
+		slog.Error("error inserting new LLM definition ID", "error", err)
 	}
 	return ret
 }
@@ -274,7 +273,7 @@ func (p *Project) DeleteLLM(def *llm.LanguageModel) {
 		;
 	`, def.ID)
 	if err != nil {
-		log.Fatalf("error deleting LLM definition: %v\n", err)
+		slog.Error("error deleting LLM definition", "error", err)
 	}
 }
 
@@ -293,12 +292,12 @@ func (p *Project) ListAgents() []AgentName {
 		;
 	`)
 	if err != nil {
-		log.Fatalf("error listing agents (select): %v\n", err)
+		slog.Error("error listing agents (select)", "error", err)
 	}
 	for rows.Next() {
 		name := AgentName{}
 		if err := rows.Scan(&name.ID, &name.Name); err != nil {
-			log.Fatalf("error listing agents (scan): %v\n", err)
+			slog.Error("error listing agents (scan)", "error", err)
 		}
 		ret = append(ret, name)
 	}
@@ -321,7 +320,7 @@ func (p *Project) GetAgent(id int64) *llm.Agent {
 	`, id)
 	var llmID int64
 	if err := row.Scan(&ret.Name, &llmID, &ret.System.Content); err != nil {
-		log.Fatalf("error getting agent (select): %v\n", err)
+		slog.Error("error getting agent (select)", "error", err)
 	}
 	ret.LLM = p.GetLLM(llmID)
 	return ret
@@ -340,7 +339,7 @@ func (p *Project) SetAgent(agent *llm.Agent) {
 		;
 	`, agent.Name, agent.LLM.ID, agent.System.Content, agent.ID)
 	if err != nil {
-		log.Fatalf("error setting agent (update): %v\n", err)
+		slog.Error("error setting agent (update)", "error", err)
 	}
 }
 
@@ -361,11 +360,11 @@ func (p *Project) NewAgent() *llm.Agent {
 		;
 	`, ret.Name, ret.LLM.ID, ret.System.Content)
 	if err != nil {
-		log.Fatalf("error creating new agent (insert): %v\n", err)
+		slog.Error("error creating new agent (insert)", "error", err)
 	}
 	ret.ID, err = res.LastInsertId()
 	if err != nil {
-		log.Fatalf("error creating new agent (last_id): %v\n", err)
+		slog.Error("error creating new agent (last_id)", "error", err)
 	}
 	return ret
 }
@@ -378,6 +377,6 @@ func (p *Project) DeleteAgent(agent *llm.Agent) {
 		;
 	`, agent.ID)
 	if err != nil {
-		log.Fatalf("error deleting agent (delete): %v\n", err)
+		slog.Error("error deleting agent (delete)", "error", err)
 	}
 }

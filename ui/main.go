@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"log"
 	"maps"
 	"os"
 	"path/filepath"
@@ -48,14 +47,16 @@ func NewMain() *Main {
 	ret.w.SetFixedSize(true)
 	hDir, err := os.UserHomeDir()
 	if err != nil {
-		log.Fatalf("error getting home dir: %v\n", err)
+		dialog.ShowError(err, w)
+		app.Quit()
 	}
 	projectPath := ret.app.Preferences().StringWithFallback(
 		"last-open-project",
 		filepath.Join(hDir, "default.gen-magic"),
 	)
 	if err := ret.LoadProject(projectPath); err != nil {
-		log.Fatalf("error loading project: %v\n", err)
+		dialog.ShowError(err, w)
+		app.Quit()
 	}
 	return ret
 }
@@ -72,7 +73,8 @@ func (m *Main) mainMenu() *fyne.MainMenu {
 			fyne.NewMenuItem("New Project", func() {
 				fileSave := dialog.NewFileSave(func(writer fyne.URIWriteCloser, err error) {
 					if err != nil {
-						log.Printf("error in new project file: %v\n", err)
+						dialog.ShowError(err, m.w)
+						m.app.Quit()
 					}
 					if writer == nil {
 						return
@@ -90,7 +92,8 @@ func (m *Main) mainMenu() *fyne.MainMenu {
 			fyne.NewMenuItem("Open Project", func() {
 				fileOpen := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 					if err != nil {
-						log.Printf("error in open project file: %v\n", err)
+						dialog.ShowError(err, m.w)
+						m.app.Quit()
 					}
 					if reader == nil {
 						return
